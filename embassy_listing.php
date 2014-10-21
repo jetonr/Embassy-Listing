@@ -39,7 +39,7 @@ function grab_embassy_info( $from_country ) {
     
     foreach ( $embassies[1] as $embassy ) {
        
-        preg_match( '#<h6.*?>(.*?)</h6>#', $embassy, $title );
+        preg_match( '#<span class=\"embassy-name\">(.*?)<\/span>#', $embassy, $title );
         preg_match( '#<div><span>City</span>(.*?)</div>#', $embassy, $city );
         preg_match( '#<div><span>Phone</span>(.*?)</div>#', $embassy, $phones );
         preg_match( '#<div><span>Fax</span>(.*?)</div>#', $embassy, $fax );
@@ -112,14 +112,14 @@ function all_embassies_arr( $limit = false, $start_from = false ) {
         $country = sanitize_title( $country );
         $country_arr[$country] = grab_embassy_info($country);
     }
-    
-    $fp = fopen('embassies_data.json', 'w');
-    fwrite($fp, json_encode( all_embassies_arr() ) );
-    fclose($fp);
 
     return $country_arr;
 }
 
+$date = date("g_i_F_j_Y"); 
+$fp = fopen( "embassies_data_$date.json", 'w' );
+fwrite($fp, json_encode( all_embassies_arr() ) );
+fclose($fp);
 
 function local_embasies_data(){
 
