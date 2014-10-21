@@ -48,7 +48,7 @@ function grab_embassy_info( $from_country ) {
         preg_match( '#<img[^>]*?(?=alt=)[^>]*>#', $embassy, $img_tag );
         preg_match( '#src="([^"]*)"#', $img_tag[0], $flag );
         preg_match( '#alt="([^"]*)"#', $img_tag[0], $to_country );
-        preg_match( '#<a\s.*?href=[\'"]mailto:([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,6})[\'"].*?>.*?</a>#i', $embassy, $email );
+        preg_match( '#<a\s.*?href=[\'"]mailto:(.*?)[\'"].*?>.*?</a>#', $embassy, $email );
         
         if ( strpos($title[1], "Embassy") ) {
             $embassy_arr[$i]['type'] = "embassy";
@@ -114,12 +114,14 @@ function all_embassies_arr( $limit = false, $start_from = false ) {
     }
 
     return $country_arr;
+/*    $date = date("g_i_F_j_Y"); 
+    $fp = fopen( "embassies_data_$date.json", 'w' );
+    fwrite($fp, json_encode( all_embassies_arr() ) );
+    fclose($fp);*/
+
 }
 
-$date = date("g_i_F_j_Y"); 
-$fp = fopen( "embassies_data_$date.json", 'w' );
-fwrite($fp, json_encode( all_embassies_arr() ) );
-fclose($fp);
+
 
 function local_embasies_data(){
 
@@ -147,6 +149,10 @@ function sc_insert_tax_terms(){
     wp_insert_term( 'Permanent Mission', 'types' );
 }
 add_action( 'wp_loaded', 'sc_insert_tax_terms' );
+
+$data = local_embasies_data();
+var_dump($data['haiti']);
+
 
 function insert_emabassy_posts( $embassy_country ) {
 
