@@ -59,17 +59,17 @@ function grab_embassy_info( $from_country ) {
         } else {
             $embassy_arr[$i]['type'] = "n/a";
         }
-        
-        $embassy_arr[$i]['from']    = $from_country;
-        $embassy_arr[$i]['to']      = sanitize_title($to_country[1]);
-        $embassy_arr[$i]['title']   = $title[1];
-        $embassy_arr[$i]['flag']    = $flag[1]; 
-        $embassy_arr[$i]['city']    = ( $city[1] != '' || $city[1] != null ) ? trim($city[1]) : 'n/a';
-        $embassy_arr[$i]['phones']  = ( $phones[1] != '' || $phones[1] != null ) ? trim($phones[1]) : 'n/a';
-        $embassy_arr[$i]['fax']     = ( $fax[1] != '' || $fax[1] != null ) ? trim($fax[1]) : 'n/a';
-        $embassy_arr[$i]['address'] = ( $address[1] != '' || $address[1] != null ) ? trim($address[1]) : 'n/a';
-        $embassy_arr[$i]['website'] = ( $website[3] != '' || $website[3] != null ) ? $website[3] : 'n/a';
-        $embassy_arr[$i]['email']   = ( $email[1] != '' || $email[1] != null ) ? trim($email[1]) : 'n/a';
+     
+        $embassy_arr[$i]['from']     = $from_country;
+        $embassy_arr[$i]['location'] = sanitize_title($to_country[1]);
+        $embassy_arr[$i]['title']    = $title[1];
+        $embassy_arr[$i]['flag']     = $flag[1]; 
+        $embassy_arr[$i]['city']     = ( $city[1] != '' || $city[1] != null ) ? trim($city[1]) : 'n/a';
+        $embassy_arr[$i]['phones']   = ( $phones[1] != '' || $phones[1] != null ) ? trim($phones[1]) : 'n/a';
+        $embassy_arr[$i]['fax']      = ( $fax[1] != '' || $fax[1] != null ) ? trim($fax[1]) : 'n/a';
+        $embassy_arr[$i]['address']  = ( $address[1] != '' || $address[1] != null ) ? trim($address[1]) : 'n/a';
+        $embassy_arr[$i]['website']  = ( $website[3] != '' || $website[3] != null ) ? $website[3] : 'n/a';
+        $embassy_arr[$i]['email']    = ( $email[1] != '' || $email[1] != null ) ? trim($email[1]) : 'n/a';
         
         $i++;
     }
@@ -133,64 +133,121 @@ function local_embasies_data(){
 
 function sc_insert_tax_terms(){
 
-
+    // Insert Embassy Cuntries
     foreach ( sc_embassy_countries() as $country ) {
-        
-        $term = term_exists( $country, 'countries' );
-        
-        if ( $term == 0 && $term == null ) {
+
+        safe_wp_insert_term( $country, 'countries' );
+    }
+
+    // Insert Embassy Types Tax
+    $types = array( 'Embassy', 'Consulate', 'Permanent Mission', 'High Commission');
+    
+    foreach ( $types as $type ) {
+
+        safe_wp_insert_term( $type, 'types' );
+    }
+}
+add_action( 'init', 'sc_insert_tax_terms' );
+
+
+function safe_wp_insert_term( $term_name, $taxonomy, $args = false ) {
+
+    $term = term_exists( $term_name, $taxonomy );
+
+    if ( $term === 0 || $term === null ) {
+
+        wp_insert_term( $term_name, $taxonomy, $args );
+    }  
+}
+
+
+function insert_emabassy_by_country( $embassy_country ) {
+
+    ini_set('max_execution_time', 1200); // 1200 seconds = 20 minute
+    
+    $data    = local_embasies_data();
+    $embassy_country = sanitize_title( $embassy_country );
+
+    foreach ( $data[$embassy_country] as $embassy ) {               
+
+        $embassy['phones'] = str_replace(array(';',' / ','and','or'), ",", $embassy['phones']);
+        $embassy['phones'] = preg_replace('/\s*,\s*/', ",", $embassy['phones']);
+
+        $embassy['fax'] = str_replace(array(';',' / ','and','or'), ",", $embassy['fax']);
+        $embassy['fax'] = preg_replace('/\s*,\s*/', ",", $embassy['fax']);
+
+        $embassy['email'] = str_replace(array(';',' / ',' and ',' or '), ",", $embassy['email']);
+        $embassy['email'] = preg_replace('/\s*,\s*/', ",", $embassy['email']);
+
+        if ($embassy['email'] == "-") {
+            $embassy['email'] = "n/a";
+        }
+
+        safe_post_insert( $embassy );
+    }
+
+}
+
+function safe_post_insert( $embassy ){
+
+    $embassy_check = get_page_by_title( $embassy['title'],'OBJECT','embassy' );
+
+    if( $embassy_check == NULL ) {
+
+        insert_embassy_post( $embassy );
+
+    } else {
+
+        $embassy_data = get_metadata( 'post', $embassy_check->ID );
+
+        if ( ($embassy_data['sc_emb_address'][0] !== $embassy['address'] ) && ( $embassy_data['sc_emb_email'][0] !== $embassy['email'] ) && ( $embassy_data['sc_emb_phone'][0] !== $embassy['phones'] ) ) {
             
-            wp_insert_term( $country, 'countries' );
+            insert_embassy_post( $embassy );
         }
     }
 
-    wp_insert_term( 'Embassy', 'types' );
-    wp_insert_term( 'Consulate', 'types' );
-    wp_insert_term( 'Permanent Mission', 'types' );
 }
-add_action( 'wp_loaded', 'sc_insert_tax_terms' );
 
-$data = local_embasies_data();
-var_dump($data['haiti']);
+function insert_embassy_post( $embassy ) {
 
-
-function insert_emabassy_posts( $embassy_country ) {
-
-    ini_set('max_execution_time', 1200); // 1200 seconds = 20 minutes
-
-    $data = local_embasies_data();
-    
-    foreach ( $data[$embassy_country] as $embassy ) {               
-        
-        $post_data = array(
-           'post_title'   => $embassy['title'],
-           'post_type'    => 'embassy',
-           'post_status'  => 'publish',
-           );
-
-        $post_id = wp_insert_post( $post_data );
-
-        wp_set_object_terms( $post_id, $embassy['from'], 'countries' );
-        wp_set_object_terms( $post_id, $embassy['type'], 'types' );            
-        
-        update_post_meta( $post_id, 'sc_embassy_address', $embassy['address'] );
-        update_post_meta( $post_id, 'sc_embassy_email', $embassy['email'] );
-        update_post_meta( $post_id, 'sc_embassy_phone', $embassy['phones'] );
-        update_post_meta( $post_id, 'sc_embassy_fax', $embassy['fax'] );
-        update_post_meta( $post_id, 'sc_embassy_website', $embassy['website'] );
-        update_post_meta( $post_id, 'sc_emb_to_country', $embassy['to'] );
-        update_post_meta( $post_id, 'sc_embassy_city', $embassy['city'] );
+    if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+        return;
     }
 
+    wp_defer_comment_counting( true );
+
+    $post_data = array(
+       'post_title'   => $embassy['title'],
+       'post_type'    => 'embassy',
+       'post_status'  => 'publish',
+       );
+
+    $post_id = wp_insert_post( $post_data );
+    
+    wp_set_object_terms( $post_id, $embassy['from'], 'countries' );
+    wp_set_object_terms( $post_id, $embassy['type'], 'types' );            
+
+
+    update_post_meta( $post_id, 'sc_emb_address', $embassy['address'] );
+    update_post_meta( $post_id, 'sc_emb_email', $embassy['email'] );
+    update_post_meta( $post_id, 'sc_emb_phone', $embassy['phones'] );
+    update_post_meta( $post_id, 'sc_emb_fax', $embassy['fax'] );
+    update_post_meta( $post_id, 'sc_emb_website', $embassy['website'] );
+    update_post_meta( $post_id, 'sc_emb_location', $embassy['to'] );
+    update_post_meta( $post_id, 'sc_emb_city', $embassy['city'] );
+
+    wp_defer_comment_counting( false );    
 }
+
 
 function add_embasy_by_name(){
-    foreach ( array_slice( sc_embassy_countries(), 11, 10 ) as $country ) {
-        insert_emabassy_posts(sanitize_title( $country) );
-    }
-}
-//add_action( 'wp_loaded', 'add_embasy_by_name' );
 
+    foreach ( array_slice( sc_embassy_countries(), 95, 10 ) as $country ) {
+        insert_emabassy_by_country( $country );
+    }
+    //insert_emabassy_by_country( 'jamaica' );
+}
+add_action( 'wp_footer', 'add_embasy_by_name' );
 
 function countries_into_columns( $cols ) {
    
